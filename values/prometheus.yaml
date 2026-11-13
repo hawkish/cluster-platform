@@ -66,7 +66,7 @@ scrapeConfigs:
         target_label: node
 
   # ArgoCD's components (application controller, server, repo server,
-  # applicationset and notifications controllers, dex), each on its "metrics"
+  # applicationset and notifications controllers), each on its "metrics"
   # port. The ArgoCD dashboards filter on cluster and namespace; scraped labels
   # that clash, like argocd_app_info's own namespace, become exported_*.
   argocd:
@@ -78,6 +78,10 @@ scrapeConfigs:
       - source_labels: [__meta_kubernetes_pod_container_port_name]
         regex: metrics
         action: keep
+      # Dex (SSO) isn't configured, so it never opens its metrics port
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: argocd-dex-server
+        action: drop
       - target_label: cluster
         replacement: home
       - source_labels: [__meta_kubernetes_namespace]
