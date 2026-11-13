@@ -10,8 +10,8 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 | --- | --- | --- | --- |
 | `loki` | `grafana/loki` 7.6.0 | `monitoring` | Single binary, filesystem storage on a 20Gi PVC, 30-day retention |
 | `alloy` | `grafana/alloy` 1.16.0 | `monitoring` | DaemonSet. Ships the logs of the pods on its node and the node's systemd journal to Loki |
-| `prometheus` | `prometheus-community/prometheus` 29.47.2 | `monitoring` | Server only, 10Gi PVC, 15-day retention. Scrapes RabbitMQ's metrics plugin |
-| `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboard: RabbitMQ-Overview |
+| `prometheus` | `prometheus-community/prometheus` 29.47.2 | `monitoring` | Server only, 10Gi PVC, 15-day retention. Scrapes RabbitMQ and ArgoCD |
+| `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboards: RabbitMQ-Overview, ArgoCD Operational and Application overviews |
 | `rabbitmq` | `cloudpirates/rabbitmq` 0.21.32 | `rabbitmq` | Values are in the `agent-board` repo |
 
 ## Add an app
@@ -30,6 +30,11 @@ Open `http://192.168.1.10:30300` and sign in as `admin`. The password is the sop
 Grafana downloads its dashboards from grafana.com when the pod starts, pinned to a revision in `values/grafana.yaml`:
 
 - **RabbitMQ-Overview** ([10991](https://grafana.com/grafana/dashboards/10991), revision 15): queue depth, message rates, connections, channels, and memory and disk per broker. It reads the metrics Prometheus scrapes from RabbitMQ's `rabbitmq_prometheus` plugin, which `agent-board`'s `rabbitmq/values.yaml` enables with `metrics.enabled`.
+
+- **ArgoCD / Operational / Overview** ([19993](https://grafana.com/grafana/dashboards/19993), revision 9): ArgoCD's own health, including reconcile times, git requests, Kubernetes API calls, and gRPC traffic.
+- **ArgoCD / Application / Overview** ([19974](https://grafana.com/grafana/dashboards/19974), revision 8): sync and health status for each app.
+
+Both ArgoCD dashboards come from the argo-cd-mixin. They read the `argocd` scrape job in `values/prometheus.yaml`, which collects every ArgoCD pod's `metrics` port and adds the `cluster="home"` label the dashboards filter on. ArgoCD itself is installed by the `nix` repo, but its pods expose metrics by default, so no change there is needed.
 
 To add one, add an entry under `dashboards.default` in `values/grafana.yaml`, and add a scrape job to `values/prometheus.yaml` if the dashboard needs new metrics.
 

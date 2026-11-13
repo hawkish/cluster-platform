@@ -54,6 +54,20 @@ dashboards:
       datasource:
         - name: DS_PROMETHEUS
           value: prometheus
+    # ArgoCD dashboards from the argo-cd-mixin, https://grafana.com/grafana/dashboards/19993
+    argocd-operational-overview:
+      gnetId: 19993
+      revision: 9
+      datasource:
+        - name: datasource
+          value: prometheus
+    # https://grafana.com/grafana/dashboards/19974
+    argocd-application-overview:
+      gnetId: 19974
+      revision: 8
+      datasource:
+        - name: datasource
+          value: prometheus
 
 testFramework:
   enabled: false
