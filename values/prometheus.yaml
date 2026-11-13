@@ -1,0 +1,44 @@
+# A single Prometheus server that scrapes RabbitMQ (and itself). Everything else
+# the chart can install is off; add scrape jobs below as more apps get metrics.
+alertmanager:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+
+server:
+  retention: 15d
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+  # Grafana reaches it in-cluster at http://prometheus-server.monitoring.svc
+  service:
+    type: ClusterIP
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      # RabbitMQ's rabbitmq_prometheus plugin, one target per broker pod.
+      # The RabbitMQ-Overview dashboard filters on the namespace label.
+      - job_name: rabbitmq
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [rabbitmq]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: prometheus
+            action: keep
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node

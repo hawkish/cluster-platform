@@ -25,6 +25,35 @@ datasources:
         url: http://loki.monitoring.svc.cluster.local:3100
         access: proxy
         isDefault: true
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+
+# Dashboards from grafana.com, downloaded by an init container on pod start
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    # RabbitMQ's official overview, https://grafana.com/grafana/dashboards/10991
+    rabbitmq-overview:
+      gnetId: 10991
+      revision: 15
+      datasource:
+        - name: DS_PROMETHEUS
+          value: prometheus
 
 testFramework:
   enabled: false
