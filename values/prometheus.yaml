@@ -10,6 +10,11 @@ prometheus-pushgateway:
   enabled: false
 
 server:
+  # 30s, not the chart's 1m: Grafana's $__rate_interval is 4x the data source's
+  # timeInterval, and rate() needs at least two samples in that window. Keep this
+  # in sync with timeInterval on the Prometheus data source in values/grafana.yaml.
+  global:
+    scrape_interval: 30s
   retention: 15d
   persistentVolume:
     enabled: true

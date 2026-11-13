@@ -30,6 +30,9 @@ datasources:
         uid: prometheus
         url: http://prometheus-server.monitoring.svc.cluster.local
         access: proxy
+        jsonData:
+          # Prometheus' scrape interval (values/prometheus.yaml), so rate() windows fit
+          timeInterval: 30s
 
 # Dashboards from grafana.com, downloaded by an init container on pod start
 dashboardProviders:
