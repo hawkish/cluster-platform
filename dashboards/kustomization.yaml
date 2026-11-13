@@ -1,0 +1,20 @@
+# One ConfigMap per dashboard. Grafana's dashboard sidecar loads every
+# ConfigMap labelled grafana_dashboard=1 in the monitoring namespace.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+
+configMapGenerator:
+  - name: dashboard-rabbitmq-overview
+    files:
+      - rabbitmq-overview.json
+  - name: dashboard-argocd-operational-overview
+    files:
+      - argocd-operational-overview.json
+  - name: dashboard-argocd-application-overview
+    files:
+      - argocd-application-overview.json

@@ -16,6 +16,10 @@ spec:
     - repoURL: https://github.com/hawkish/cluster-platform.git
       targetRevision: main
       ref: values
+    # Dashboard ConfigMaps, built by dashboards/kustomization.yaml
+    - repoURL: https://github.com/hawkish/cluster-platform.git
+      targetRevision: main
+      path: dashboards
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
@@ -25,3 +29,6 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # The RabbitMQ dashboard ConfigMap is close to client-side apply's 256 KiB
+      # last-applied annotation limit
+      - ServerSideApply=true

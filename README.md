@@ -11,7 +11,7 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 | `loki` | `grafana/loki` 7.6.0 | `monitoring` | Single binary, filesystem storage on a 20Gi PVC, 30-day retention |
 | `alloy` | `grafana/alloy` 1.16.0 | `monitoring` | DaemonSet. Ships the logs of the pods on its node and the node's systemd journal to Loki |
 | `prometheus` | `prometheus-community/prometheus` 29.47.2 | `monitoring` | Server only, 10Gi PVC, 15-day retention. Scrapes RabbitMQ and ArgoCD |
-| `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboards: RabbitMQ-Overview, ArgoCD Operational and Application overviews |
+| `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboards from `dashboards/` via the sidecar |
 | `rabbitmq` | `cloudpirates/rabbitmq` 0.21.32 | `rabbitmq` | Values are in the `agent-board` repo |
 
 ## Add an app
@@ -27,16 +27,34 @@ Open `http://192.168.1.10:30300` and sign in as `admin`. The password is the sop
 
 ## Dashboards
 
-Grafana downloads its dashboards from grafana.com when the pod starts, pinned to a revision in `values/grafana.yaml`:
+Dashboards are JSON files in [`dashboards/`](dashboards/). [`dashboards/kustomization.yaml`](dashboards/kustomization.yaml) turns each one into a ConfigMap labelled `grafana_dashboard: "1"`, and the Grafana `Application` syncs them as its third source. Grafana's dashboard sidecar loads every ConfigMap with that label and reloads Grafana when one changes, without a pod restart.
 
-- **RabbitMQ-Overview** ([10991](https://grafana.com/grafana/dashboards/10991), revision 15): queue depth, message rates, connections, channels, and memory and disk per broker. It reads the metrics Prometheus scrapes from RabbitMQ's `rabbitmq_prometheus` plugin, which `agent-board`'s `rabbitmq/values.yaml` enables with `metrics.enabled`.
+| File | Dashboard | Origin |
+| --- | --- | --- |
+| `rabbitmq-overview.json` | RabbitMQ-Overview: queue depth, message rates, connections, channels, and memory and disk per broker | [10991](https://grafana.com/grafana/dashboards/10991), revision 15 |
+| `argocd-operational-overview.json` | ArgoCD / Operational / Overview: reconcile times, git requests, Kubernetes API calls, and gRPC traffic | [19993](https://grafana.com/grafana/dashboards/19993), revision 9 |
+| `argocd-application-overview.json` | ArgoCD / Application / Overview: sync and health status for each app | [19974](https://grafana.com/grafana/dashboards/19974), revision 8 |
 
-- **ArgoCD / Operational / Overview** ([19993](https://grafana.com/grafana/dashboards/19993), revision 9): ArgoCD's own health, including reconcile times, git requests, Kubernetes API calls, and gRPC traffic.
-- **ArgoCD / Application / Overview** ([19974](https://grafana.com/grafana/dashboards/19974), revision 8): sync and health status for each app.
+The files are exports of those revisions with the data source set to the `prometheus` UID, so they don't depend on grafana.com at runtime.
 
-Both ArgoCD dashboards come from the argo-cd-mixin. They read the `argocd` scrape job in `values/prometheus.yaml`, which collects every ArgoCD pod's `metrics` port and adds the `cluster="home"` label the dashboards filter on. ArgoCD itself is installed by the `nix` repo, but its pods expose metrics by default, so no change there is needed.
+The RabbitMQ dashboard reads the metrics that `agent-board`'s `metrics.enabled` turns on. The ArgoCD dashboards read the `argocd` scrape job in `values/prometheus.yaml`, which adds the `cluster="home"` label they filter on.
 
-To add one, add an entry under `dashboards.default` in `values/grafana.yaml`, and add a scrape job to `values/prometheus.yaml` if the dashboard needs new metrics.
+### Save a change made in the UI
+
+Grafana can't save over a dashboard that comes from a file, and Grafana has no persistent volume, so changes made only in the UI are lost on the next restart. To keep a change:
+
+1. In the dashboard, select **Export** > **Export as JSON**, and then copy or download the JSON.
+2. Overwrite the dashboard's file in `dashboards/`. Keep its `uid` so links still work.
+3. Commit and push. ArgoCD updates the ConfigMap, and the sidecar reloads the dashboard within about a minute.
+
+### Add a dashboard
+
+1. Build it in the UI, or download one from grafana.com, and save the JSON to `dashboards/<name>.json`. Point its panels at the data source UID `prometheus` or `loki`.
+2. Add an entry for it under `configMapGenerator` in `dashboards/kustomization.yaml`.
+3. If it needs new metrics, add a scrape job to `values/prometheus.yaml`.
+4. Commit and push.
+
+Keep each file under about 900 KB. A ConfigMap can't exceed 1 MiB.
 
 ## Query logs
 
