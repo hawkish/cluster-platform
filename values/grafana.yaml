@@ -1,0 +1,30 @@
+# Admin credentials come from the "grafana-admin" Secret, reconciled from sops by
+# grafana-admin-password.service in the nix repo (modules/nixos/opt/k3s.nix).
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+# No PVC: Grafana's state is provisioned from this file, and the admin user is
+# re-seeded from the Secret on every start, so a rotated password takes effect
+# on the next pod restart.
+persistence:
+  enabled: false
+
+service:
+  type: NodePort
+  nodePort: 30300
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        uid: loki
+        url: http://loki.monitoring.svc.cluster.local:3100
+        access: proxy
+        isDefault: true
+
+testFramework:
+  enabled: false

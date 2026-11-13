@@ -1,0 +1,29 @@
+# Adopted from agent-board's argocd/application.yaml (same name, so ArgoCD takes
+# over the existing Application instead of creating a second one). The values
+# still live in the agent-board repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rabbitmq
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: registry-1.docker.io/cloudpirates
+      chart: rabbitmq
+      targetRevision: 0.21.32
+      helm:
+        valueFiles:
+          - $values/rabbitmq/values.yaml
+    - repoURL: https://github.com/hawkish/agent-board.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rabbitmq
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
