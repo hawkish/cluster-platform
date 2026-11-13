@@ -12,7 +12,7 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 | `alloy` | `grafana/alloy` 1.16.0 | `monitoring` | DaemonSet. Ships the logs of the pods on its node and the node's systemd journal to Loki |
 | `prometheus` | `prometheus-community/prometheus` 29.47.2 | `monitoring` | Server only, 10Gi PVC, 15-day retention. Scrapes RabbitMQ and ArgoCD |
 | `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboards from `dashboards/` via the sidecar |
-| `rabbitmq` | `cloudpirates/rabbitmq` 0.21.32 | `rabbitmq` | Values are in the `agent-board` repo |
+| `rabbitmq` | `cloudpirates/rabbitmq` 0.21.32 | `rabbitmq` | 3 clustered brokers. Management UI on `http://192.168.1.10:30082`, AMQP on `30672`, metrics on `30692` |
 
 ## Add an app
 
@@ -20,6 +20,23 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 2. Commit and push to `main`. ArgoCD picks up the change on its next poll, within three minutes.
 
 Don't commit secret values. Add the secret to sops in the `nix` repo and sync it into the cluster with a oneshot service, like `grafana-admin-password.service`, or commit a sealed secret.
+
+## RabbitMQ
+
+RabbitMQ runs as 3 clustered brokers from [CloudPirates](https://github.com/CloudPirates-io/helm-charts)' chart, pulled from `oci://registry-1.docker.io/cloudpirates/rabbitmq` with [`values/rabbitmq.yaml`](values/rabbitmq.yaml) layered on top. Bitnami's free RabbitMQ chart and images were discontinued, and CloudPirates' chart is a community-maintained replacement with the same values schema.
+
+The nix repo's `rabbitmq-admin-password.service` (in `modules/nixos/opt/k3s.nix`, server host only) reconciles everything secret from sops, so no password or hash is committed here:
+
+- **`rabbitmq-credentials` Secret:** the admin password and Erlang cookie, from the `rabbitmq_admin_password` and `rabbitmq_erlang_cookie` sops secrets. `auth.existingSecret` points at it, so Helm never generates a random password that drifts on every ArgoCD re-render.
+- **`rabbitmq-definitions` Secret:** `defs.json`, with the `agenda` quorum queue and the `admin` user's password hash. `definitions.existingSecret` points at it. When the chart renders its own definitions ConfigMap instead, it adds an `admin` user with `password: ""` whenever `auth.username` isn't in `definitions.users`, and the auto-reload sidecar re-imports that on every change, wiping the real admin password.
+- **The `agenda` user:** created with `rabbitmqctl`, its password synced from the `rabbitmq_agenda_password` sops secret. It can configure and read only `^agenda$`, and write to `^(agenda|amq\.default)$`, because publishing to a queue by name goes through the default exchange.
+
+To change the `agenda` queue's declaration, edit the `rabbitmq-admin-password` script in `k3s.nix` and rebuild the server host.
+
+### Passwords
+
+- **Admin:** the `rabbitmq_admin_password` sops secret in the nix repo's `secrets/nixos/secrets.json`. Log in to the management UI at `http://192.168.1.10:30082` as `admin`.
+- **`agenda` user:** the `rabbitmq_agenda_password` sops secret. zsh exports it as `RABBITMQ_AGENDA_PASSWORD` on `nixos` and `nixos2` only, the hosts that can reach the broker. To rotate it, update the secret in both `nixos` and `nixos2`'s sops files and rebuild. Rebuilding the server host re-runs the oneshot, which updates the broker. Open a new shell on each host to pick up the new value.
 
 ## Log in to Grafana
 
@@ -37,7 +54,7 @@ Dashboards are JSON files in [`dashboards/`](dashboards/). [`dashboards/kustomiz
 
 The files are exports of those revisions with the data source set to the `prometheus` UID, so they don't depend on grafana.com at runtime.
 
-The RabbitMQ dashboard reads the metrics that `agent-board`'s `metrics.enabled` turns on. The ArgoCD dashboards read the `argocd` scrape job in `values/prometheus.yaml`, which adds the `cluster="home"` label they filter on.
+The RabbitMQ dashboard reads the metrics that `metrics.enabled` in `values/rabbitmq.yaml` turns on. The ArgoCD dashboards read the `argocd` scrape job in `values/prometheus.yaml`, which adds the `cluster="home"` label they filter on.
 
 ### Save a change made in the UI
 

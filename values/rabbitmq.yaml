@@ -1,0 +1,34 @@
+replicaCount: 3
+
+auth:
+  existingSecret: "rabbitmq-credentials"
+
+peerDiscoveryK8sPlugin:
+  enabled: true
+
+serviceAccount:
+  automountServiceAccountToken: true
+
+service:
+  type: NodePort
+  nodePorts:
+    mgmt: "30082"
+    amqp: "30672"
+    # Pinned so the metrics port doesn't get a random NodePort
+    metrics: "30692"
+
+# rabbitmq_prometheus plugin on 15692, scraped by the prometheus app (values/prometheus.yaml)
+metrics:
+  enabled: true
+
+definitions:
+  enabled: true
+  autoReload:
+    enabled: true
+  # Sourced from the "rabbitmq-definitions" secret (queues + the admin user's
+  # password_hash) instead of this file's own queues/users keys, which the
+  # chart would otherwise render into its own ConfigMap - and auto-inject an
+  # "admin" entry with password: "" into, wiping the real password on every
+  # reimport. The secret is reconciled from sops by k3s.nix's
+  # rabbitmq-admin-password.service, so no password hash is committed here.
+  existingSecret: "rabbitmq-definitions"
