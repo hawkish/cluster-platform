@@ -40,10 +40,10 @@ The `nix` repo's `pythia-secrets.service` (in `modules/nixos/opt/k3s.nix`) recon
 ### Connect Claude Code
 
 ```bash
-claude mcp add --transport http pythia http://192.168.1.10:30310/mcp --header "Authorization: Bearer ${PYTHIA_TOKEN}"
+claude mcp add --transport http --scope user pythia http://192.168.1.10:30310/mcp --header 'Authorization: Bearer ${PYTHIA_TOKEN}'
 ```
 
-zsh exports `PYTHIA_TOKEN` on `mini` from the same `pythia_token` sops secret.
+zsh exports `PYTHIA_TOKEN` on `mini` from the same `pythia_token` sops secret. The single quotes keep the variable unexpanded in `~/.claude.json`, so Claude Code reads it at startup, and a rotated token only needs a new shell.
 
 Its `patterns` tool needs `pattern_ingester.enabled` in [`values/loki.yaml`](values/loki.yaml).
 
