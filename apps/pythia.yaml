@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pythia
+  namespace: argocd
+spec:
+  project: default
+  # Plain manifests in this repo, not the private hawkish/pythia repo: the
+  # image is the release, and newTag in pythia/kustomization.yaml says which
+  # one runs.
+  source:
+    repoURL: https://github.com/hawkish/cluster-platform.git
+    targetRevision: main
+    path: pythia
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,18 @@
+# NodePort so Claude Code on the LAN reaches it at
+# http://192.168.1.10:30310/mcp. The bearer token, not the network, is what
+# keeps the logs private: NodePorts are open LAN-wide.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pythia
+  labels:
+    app.kubernetes.io/name: pythia
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: pythia
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30310

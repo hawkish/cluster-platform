@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pythia
+  labels:
+    app.kubernetes.io/name: pythia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pythia
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pythia
+    spec:
+      # The image is private like its repo. Both Secrets are reconciled from
+      # sops by pythia-secrets.service in the nix repo (modules/nixos/opt/k3s.nix).
+      imagePullSecrets:
+        - name: ghcr-pull
+      # pythia only calls Loki over HTTP; it needs no Kubernetes API access.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pythia
+          image: ghcr.io/hawkish/pythia
+          # The image's entrypoint is `pythia serve`; listen on every
+          # interface so the Service can reach it.
+          args: ["--listen", "0.0.0.0:8080"]
+          env:
+            - name: LOKI_URL
+              value: http://loki.monitoring.svc.cluster.local:3100
+            # pythia refuses to start without it, so a missing Secret shows
+            # up as CreateContainerConfigError, never as open logs.
+            - name: PYTHIA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pythia-token
+                  key: token
+          ports:
+            - name: http
+              containerPort: 8080
+          # /healthz needs no token and doesn't call Loki: a Loki restart
+          # shouldn't take pythia down with it.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

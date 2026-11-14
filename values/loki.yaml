@@ -21,6 +21,12 @@ loki:
   compactor:
     retention_enabled: true
     delete_request_store: filesystem
+  # Groups recent lines into templates for pythia's `patterns` tool ("this
+  # error appeared 4000 times"). In memory only, for recent data, so it adds
+  # no storage. volume_enabled, which pythia's `volume` tool needs, is already
+  # on in the chart's default limits_config, and Helm merges ours over it.
+  pattern_ingester:
+    enabled: true
 
 singleBinary:
   replicas: 1

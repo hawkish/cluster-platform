@@ -13,6 +13,7 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 | `prometheus` | `prometheus-community/prometheus` 29.47.2 | `monitoring` | Server only, 10Gi PVC, 15-day retention. Scrapes RabbitMQ and ArgoCD |
 | `grafana` | `grafana-community/grafana` 14.4.1 | `monitoring` | UI on `http://192.168.1.10:30300`. Data sources: Loki (default) and Prometheus. Dashboards from `dashboards/` via the sidecar |
 | `rabbitmq` | `cloudpirates/rabbitmq` 0.21.32 | `rabbitmq` | 3 clustered brokers. Management UI on `http://192.168.1.10:30082`, AMQP on `30672`, metrics on `30692` |
+| `pythia` | plain manifests in [`pythia/`](pythia/) | `monitoring` | Read-only Loki MCP server for Claude Code, on `http://192.168.1.10:30310/mcp` behind a bearer token |
 
 ## Add an app
 
@@ -20,6 +21,31 @@ The cluster itself, ArgoCD, sealed-secrets, and all secrets are managed in the `
 2. Commit and push to `main`. ArgoCD picks up the change on its next poll, within three minutes.
 
 Don't commit secret values. Add the secret to sops in the `nix` repo and sync it into the cluster with a oneshot service, like `grafana-admin-password.service`, or commit a sealed secret.
+
+## pythia
+
+[pythia](https://github.com/hawkish/pythia) (a private repo) is a read-only MCP server over Loki. With it, Claude Code can read the cluster's pod logs and node journals itself instead of asking you to paste from Grafana. [`apps/pythia.yaml`](apps/pythia.yaml) syncs the plain manifests in [`pythia/`](pythia/). They live here rather than in the pythia repo because this repo decides what runs, and the pythia repo only produces images.
+
+### Roll out a release
+
+pythia's CI pushes `ghcr.io/hawkish/pythia:vX.Y.Z` for each release. Nothing changes in the cluster until you set `newTag` in [`pythia/kustomization.yaml`](pythia/kustomization.yaml) to that tag, then commit and push.
+
+### Secrets
+
+The `nix` repo's `pythia-secrets.service` (in `modules/nixos/opt/k3s.nix`) reconciles two Secrets from sops, so no token is committed here:
+
+- **`pythia-token`:** the bearer token, from the `pythia_token` sops secret. pythia refuses to start without it. Rotating the token restarts the Deployment.
+- **`ghcr-pull`:** the imagePullSecret for the private image, from `argocd_access_token`. That token has `read:packages` as well as `repo`.
+
+### Connect Claude Code
+
+```bash
+claude mcp add --transport http pythia http://192.168.1.10:30310/mcp --header "Authorization: Bearer ${PYTHIA_TOKEN}"
+```
+
+zsh exports `PYTHIA_TOKEN` on `mini` from the same `pythia_token` sops secret.
+
+Its `patterns` tool needs `pattern_ingester.enabled` in [`values/loki.yaml`](values/loki.yaml).
 
 ## RabbitMQ
 
