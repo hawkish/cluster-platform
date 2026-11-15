@@ -1,4 +1,4 @@
-# pythia, the read-only Loki MCP server Claude Code connects to.
+# pythia, the read-only Loki MCP server that MCP clients connect to.
 #
 # Rolling out a release is a one-line edit: set newTag to the tag CI pushed
 # (ghcr.io/hawkish/pythia:vX.Y.Z), commit and push. Pinned rather than
@@ -12,4 +12,4 @@ resources:
 
 images:
   - name: ghcr.io/hawkish/pythia
-    newTag: v0.3.1
+    newTag: v0.4.0
