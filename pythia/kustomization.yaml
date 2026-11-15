@@ -12,4 +12,4 @@ resources:
 
 images:
   - name: ghcr.io/hawkish/pythia
-    newTag: v0.1.2
+    newTag: v0.2.1
