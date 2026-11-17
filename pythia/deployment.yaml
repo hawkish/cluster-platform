@@ -35,6 +35,10 @@ spec:
           env:
             - name: LOKI_URL
               value: http://loki.monitoring.svc.cluster.local:3100
+            # Turns on the metric tools (v0.5.0 and later). The chart's
+            # Service listens on port 80, with no auth in-cluster.
+            - name: PROMETHEUS_URL
+              value: http://prometheus-server.monitoring.svc
             # pythia refuses to start without it, so a missing Secret shows
             # up as CreateContainerConfigError, never as open logs.
             - name: PYTHIA_TOKEN
